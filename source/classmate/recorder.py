@@ -15,6 +15,11 @@ import soundcard as sc
 import soundfile as sf
 
 
+# Recording parameters
+_SAMPLE_RATE = 16_000   # Whisper works best at 16 kHz
+_CHANNELS = 1           # Mono is enough and halves the file size
+
+
 class MeetingRecorder:
     def __init__(self, sample_rate: int = _SAMPLE_RATE, channels: int = _CHANNELS):
         self.sample_rate = sample_rate
