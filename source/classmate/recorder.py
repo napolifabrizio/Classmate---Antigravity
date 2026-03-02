@@ -15,87 +15,79 @@ import soundcard as sc
 import soundfile as sf
 
 
-# Recording parameters
-_SAMPLE_RATE = 16_000   # Whisper works best at 16 kHz
-_CHANNELS = 1           # Mono is enough and halves the file size
+class MeetingRecorder:
+    def __init__(self, sample_rate: int = _SAMPLE_RATE, channels: int = _CHANNELS):
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.stop_event = threading.Event()
+        self.mic_data: list[np.ndarray] = []
+        self.spk_data: list[np.ndarray] = []
+        self.mic = sc.default_microphone()
+        self.speaker = sc.default_speaker()
+        try:
+            self.loopback = sc.get_microphone(id=self.speaker.id, include_loopback=True)
+        except TypeError:
+            self.loopback = sc.get_microphone(id=str(self.speaker.id))
 
+    def _record_mic(self) -> None:
+        try:
+            with self.mic.recorder(samplerate=self.sample_rate, channels=self.channels) as recorder:
+                while not self.stop_event.is_set():
+                    self.mic_data.append(recorder.record(numframes=self.sample_rate // 10))
+        except Exception:
+            pass
 
-def record_until_enter() -> str:
-    """
-    Start recording the microphone and system audio loopback. Returns the path 
-    to a temporary WAV file that contains the full recording once the user presses Enter.
+    def _record_spk(self) -> None:
+        try:
+            with self.loopback.recorder(samplerate=self.sample_rate, channels=self.channels) as recorder:
+                while not self.stop_event.is_set():
+                    self.spk_data.append(recorder.record(numframes=self.sample_rate // 10))
+        except Exception:
+            pass
 
-    Returns
-    -------
-    str
-        Absolute path to the temporary WAV file.
-    """
-    return record_meeting()
+    def start(self) -> None:
+        self.stop_event.clear()
+        self.mic_data = []
+        self.spk_data = []
+        self.t_mic = threading.Thread(target=self._record_mic)
+        self.t_spk = threading.Thread(target=self._record_spk)
+        self.t_mic.start()
+        self.t_spk.start()
+
+    def stop(self) -> str:
+        self.stop_event.set()
+        self.t_mic.join()
+        self.t_spk.join()
+
+        if not self.mic_data and not self.spk_data:
+            raise RuntimeError("No audio was recorded.")
+
+        m_arr = np.concatenate(self.mic_data, axis=0) if self.mic_data else np.zeros((0, 1), dtype=np.float32)
+        s_arr = np.concatenate(self.spk_data, axis=0) if self.spk_data else np.zeros((0, 1), dtype=np.float32)
+
+        max_len = max(len(m_arr), len(s_arr))
+        if len(m_arr) < max_len:
+            m_arr = np.pad(m_arr, ((0, max_len - len(m_arr)), (0, 0)), mode='constant')
+        if len(s_arr) < max_len:
+            s_arr = np.pad(s_arr, ((0, max_len - len(s_arr)), (0, 0)), mode='constant')
+
+        audio = m_arr + s_arr
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp.close()
+        sf.write(tmp.name, audio, self.sample_rate)
+        return tmp.name
 
 
 def record_meeting() -> str:
     """
-    High-level wrapper: starts recording, waits for Enter, stops, returns path.
-    This function is meant to be called from the CLI.
+    High-level wrapper for CLI: starts recording, waits for Enter, stops, returns path.
     """
-    mic = sc.default_microphone()
-    speaker = sc.default_speaker()
-    
-    try:
-        loopback = sc.get_microphone(id=speaker.id, include_loopback=True)
-    except TypeError:
-        # Fallback for older soundcard versions
-        loopback = sc.get_microphone(id=str(speaker.id))
-
-    stop_event = threading.Event()
-    mic_data: list[np.ndarray] = []
-    spk_data: list[np.ndarray] = []
-
-    def _record_mic() -> None:
-        try:
-            with mic.recorder(samplerate=_SAMPLE_RATE, channels=_CHANNELS) as recorder:
-                while not stop_event.is_set():
-                    mic_data.append(recorder.record(numframes=_SAMPLE_RATE // 10))
-        except Exception:
-            pass
-
-    def _record_spk() -> None:
-        try:
-            with loopback.recorder(samplerate=_SAMPLE_RATE, channels=_CHANNELS) as recorder:
-                while not stop_event.is_set():
-                    spk_data.append(recorder.record(numframes=_SAMPLE_RATE // 10))
-        except Exception:
-            pass
-
-    t_mic = threading.Thread(target=_record_mic)
-    t_spk = threading.Thread(target=_record_spk)
-    t_mic.start()
-    t_spk.start()
-
+    recorder = MeetingRecorder()
+    recorder.start()
     input()  # blocks until user presses Enter
-    stop_event.set()
-    
-    t_mic.join()
-    t_spk.join()
+    return recorder.stop()
 
-    if not mic_data and not spk_data:
-        raise RuntimeError("No audio was recorded.")
 
-    m_arr = np.concatenate(mic_data, axis=0) if mic_data else np.zeros((0, 1), dtype=np.float32)
-    s_arr = np.concatenate(spk_data, axis=0) if spk_data else np.zeros((0, 1), dtype=np.float32)
-
-    # Pad the shorter array with zeros
-    max_len = max(len(m_arr), len(s_arr))
-    if len(m_arr) < max_len:
-        m_arr = np.pad(m_arr, ((0, max_len - len(m_arr)), (0, 0)), mode='constant')
-    if len(s_arr) < max_len:
-        s_arr = np.pad(s_arr, ((0, max_len - len(s_arr)), (0, 0)), mode='constant')
-
-    # Sum Mic and Speakers to create a single Mono track
-    audio = m_arr + s_arr
-
-    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    tmp.close()
-    sf.write(tmp.name, audio, _SAMPLE_RATE)
-
-    return tmp.name
+def record_until_enter() -> str:
+    """Legacy wrapper."""
+    return record_meeting()
