@@ -12,8 +12,9 @@ if str(_SOURCE_DIR) not in sys.path:
 
 from classmate.transcriber import transcribe
 from classmate.reviewer import review
-from classmate.storage import save
+from classmate.storage import save, format_review
 from classmate.recorder import MeetingRecorder
+from datetime import datetime
 
 # Load environment variables
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -85,8 +86,9 @@ def process_audio(audio_path, delete_after=False):
         meeting_review = review(transcript, client=client)
         st.session_state.review = meeting_review
         
-        st.write("Saving results...")
-        transcript_path, review_path = save(transcript, meeting_review, audio_path)
+        st.write("Review complete!")
+        # We don't save to the data/ folder if running in Streamlit
+        # transcript_path, review_path = save(transcript, meeting_review, audio_path)
         
         status.update(label="Process complete!", state="complete", expanded=False)
     
@@ -96,7 +98,7 @@ def process_audio(audio_path, delete_after=False):
         except:
             pass
     
-    st.success("Meeting processed and saved successfully!")
+    st.success("Meeting processed! You can now download the results below.")
 
 # Sidebar
 with st.sidebar:
@@ -159,24 +161,53 @@ with tabs[1]:
 
 # Results Display
 if st.session_state.transcript or st.session_state.review:
-    st.markdown("---")
-    res_col1, res_col2 = st.columns(2)
-    
-    with res_col1:
-        if st.session_state.transcript:
-            with st.expander("📝 Full Transcript", expanded=True):
-                st.markdown(st.session_state.transcript)
-    
-    with res_col2:
-        if st.session_state.review:
-            with st.expander("📊 AI Review", expanded=True):
-                review_data = st.session_state.review
-                st.markdown(f"### Summary\n{review_data.get('summary', '')}")
-                
+    if st.session_state.review:
+        st.markdown("---")
+        st.subheader("📊 AI Review")
+        
+        review_data = st.session_state.review
+        st.markdown(f"### Summary\n{review_data.get('summary', '')}")
+        
+        action_items = review_data.get('action_items', [])
+        
+        if action_items:
+            col1, col2 = st.columns(2)
+            with col1:
                 st.markdown("### Key Points")
                 for point in review_data.get('key_points', []):
                     st.markdown(f"- {point}")
-                
+            
+            with col2:
                 st.markdown("### Action Items")
-                for item in review_data.get('action_items', []):
+                for item in action_items:
                     st.markdown(f"- [ ] {item}")
+        else:
+            st.markdown("### Key Points")
+            for point in review_data.get('key_points', []):
+                st.markdown(f"- {point}")
+    
+    st.markdown("---")
+    st.subheader("📥 Download Results")
+    down_col1, down_col2 = st.columns(2)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    audio_name = Path(st.session_state.audio_path).stem if st.session_state.audio_path else "meeting"
+    
+    with down_col1:
+        if st.session_state.transcript:
+            st.download_button(
+                label="📄 Download Transcript",
+                data=st.session_state.transcript,
+                file_name=f"{timestamp}_{audio_name}_transcript.txt",
+                mime="text/plain"
+            )
+            
+    with down_col2:
+        if st.session_state.review:
+            review_md = format_review(st.session_state.review, timestamp, st.session_state.audio_path or "N/A")
+            st.download_button(
+                label="📊 Download Review (Markdown)",
+                data=review_md,
+                file_name=f"{timestamp}_{audio_name}_review.md",
+                mime="text/markdown"
+            )

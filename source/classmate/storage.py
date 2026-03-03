@@ -15,6 +15,43 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DATA_DIR = _PROJECT_ROOT / "data"
 
 
+def format_review(review: dict, timestamp: str, audio_path: str) -> str:
+    """
+    Format the review dict into a Markdown string.
+    """
+    key_points_md = "\n".join(f"- {p}" for p in review.get("key_points", []))
+    
+    action_items_list = review.get("action_items", [])
+    action_items_section = ""
+    if action_items_list:
+        action_items_md = "\n".join(f"- [ ] {a}" for a in action_items_list)
+        action_items_section = f"""
+---
+
+## Action Items
+
+{action_items_md}
+"""
+
+    return f"""\
+# Meeting Review — {timestamp}
+
+**Source file:** `{audio_path}`
+
+---
+
+## Summary
+
+{review.get("summary", "")}
+
+---
+
+## Key Points
+
+{key_points_md}
+{action_items_section}"""
+
+
 def save(
     transcript: str,
     review: dict,
@@ -53,34 +90,7 @@ def save(
 
     # --- Review file (Markdown) ---
     review_path = _DATA_DIR / f"{timestamp}_{audio_name}_review.md"
-    key_points_md = "\n".join(f"- {p}" for p in review.get("key_points", []))
-    action_items_md = "\n".join(f"- [ ] {a}" for a in review.get("action_items", []))
-    if not action_items_md:
-        action_items_md = "_No action items identified._"
-
-    review_md = f"""\
-# Meeting Review — {timestamp}
-
-**Source file:** `{audio_path}`
-
----
-
-## Summary
-
-{review.get("summary", "")}
-
----
-
-## Key Points
-
-{key_points_md}
-
----
-
-## Action Items
-
-{action_items_md}
-"""
+    review_md = format_review(review, timestamp, audio_path)
     review_path.write_text(review_md, encoding="utf-8")
 
     return transcript_path, review_path
