@@ -9,6 +9,7 @@ from __future__ import annotations
 import tempfile
 import threading
 from pathlib import Path
+import ctypes
 
 import numpy as np
 import soundcard as sc
@@ -20,6 +21,15 @@ _SAMPLE_RATE = 16_000   # Whisper works best at 16 kHz
 _CHANNELS = 1           # Mono is enough and halves the file size
 
 
+def _ensure_com_initialized():
+    """Ensure COM is initialized on the current thread (required for Windows/Streamlit)."""
+    try:
+        if hasattr(ctypes.windll, 'ole32'):
+            ctypes.windll.ole32.CoInitialize(0)
+    except Exception:
+        pass
+
+
 class MeetingRecorder:
     def __init__(self, sample_rate: int = _SAMPLE_RATE, channels: int = _CHANNELS):
         self.sample_rate = sample_rate
@@ -27,6 +37,8 @@ class MeetingRecorder:
         self.stop_event = threading.Event()
         self.mic_data: list[np.ndarray] = []
         self.spk_data: list[np.ndarray] = []
+        
+        _ensure_com_initialized()
         self.mic = sc.default_microphone()
         self.speaker = sc.default_speaker()
         try:
@@ -35,20 +47,26 @@ class MeetingRecorder:
             self.loopback = sc.get_microphone(id=str(self.speaker.id))
 
     def _record_mic(self) -> None:
+        _ensure_com_initialized()
         try:
             with self.mic.recorder(samplerate=self.sample_rate, channels=self.channels) as recorder:
                 while not self.stop_event.is_set():
-                    self.mic_data.append(recorder.record(numframes=self.sample_rate // 10))
-        except Exception:
-            pass
+                    data = recorder.record(numframes=self.sample_rate // 10)
+                    if data is not None and len(data) > 0:
+                        self.mic_data.append(data)
+        except Exception as e:
+            print(f"Error in mic thread: {e}")
 
     def _record_spk(self) -> None:
+        _ensure_com_initialized()
         try:
             with self.loopback.recorder(samplerate=self.sample_rate, channels=self.channels) as recorder:
                 while not self.stop_event.is_set():
-                    self.spk_data.append(recorder.record(numframes=self.sample_rate // 10))
-        except Exception:
-            pass
+                    data = recorder.record(numframes=self.sample_rate // 10)
+                    if data is not None and len(data) > 0:
+                        self.spk_data.append(data)
+        except Exception as e:
+            print(f"Error in speaker thread: {e}")
 
     def start(self) -> None:
         self.stop_event.clear()
