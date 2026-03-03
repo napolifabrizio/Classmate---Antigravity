@@ -13,8 +13,8 @@ if str(_SOURCE_DIR) not in sys.path:
 from classmate.transcriber import transcribe
 from classmate.reviewer import review
 from classmate.storage import save, format_review
-from classmate.recorder import MeetingRecorder
 from datetime import datetime
+from streamlit_mic_recorder import mic_recorder
 
 # Load environment variables
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -63,10 +63,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize Session State
-if 'recording' not in st.session_state:
-    st.session_state.recording = False
-if 'recorder' not in st.session_state:
-    st.session_state.recorder = None
 if 'audio_path' not in st.session_state:
     st.session_state.audio_path = None
 if 'transcript' not in st.session_state:
@@ -123,29 +119,25 @@ tabs = st.tabs(["🎤 Record Meeting", "📁 Upload Audio"])
 
 with tabs[0]:
     st.subheader("Live Recording")
-    col1, col2 = st.columns(2)
+    st.info("💡 Recording happens in your browser. Note: System audio capture is limited in browser-side recording.")
     
-    with col1:
-        if not st.session_state.recording:
-            if st.button("🔴 Start Recording", type="primary"):
-                st.session_state.recording = True
-                st.session_state.recorder = MeetingRecorder()
-                st.session_state.recorder.start()
-                st.rerun()
-        else:
-            if st.button("⏹️ Stop & Process"):
-                st.session_state.recording = False
-                st.session_state.audio_path = st.session_state.recorder.stop()
-                st.session_state.recorder = None
-                process_audio(st.session_state.audio_path, delete_after=True)
-                st.rerun()
-
-    with col2:
-        if st.session_state.recording:
-            st.warning("Recording in progress...")
-            st.spinner("Capturing audio from mic and system...")
-        else:
-            st.info("Ready to record.")
+    audio_data = mic_recorder(
+        start_prompt="🔴 Start Recording",
+        stop_prompt="⏹️ Stop & Process",
+        just_once=True,
+        use_container_width=True,
+        format="wav",
+        key="browser_recorder"
+    )
+    
+    if audio_data:
+        # Save browser recorded bytes to a temporary file
+        temp_audio = "browser_recording.wav"
+        with open(temp_audio, "wb") as f:
+            f.write(audio_data['bytes'])
+        
+        st.session_state.audio_path = temp_audio
+        process_audio(temp_audio, delete_after=True)
 
 with tabs[1]:
     st.subheader("Process Audio File")

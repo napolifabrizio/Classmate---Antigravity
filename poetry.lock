@@ -1675,6 +1675,33 @@ cffi = ">=1.0"
 numpy = "*"
 
 [[package]]
+name = "speechrecognition"
+version = "3.14.5"
+description = "Library for performing speech recognition, with support for several engines and APIs, online and offline."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "speechrecognition-3.14.5-py3-none-any.whl", hash = "sha256:0c496d74e9f29b1daadb0d96f5660f47563e42bf09316dacdd57094c5095977e"},
+    {file = "speechrecognition-3.14.5.tar.gz", hash = "sha256:2d185192986b9b67a1502825a330e971f59a2cae0262f727a19ad1f6b586d00a"},
+]
+
+[package.dependencies]
+typing-extensions = "*"
+
+[package.extras]
+assemblyai = ["requests"]
+audio = ["PyAudio (>=0.2.11)"]
+dev = ["mypy", "numpy", "pytest", "pytest-randomly", "respx", "types-requests"]
+faster-whisper = ["faster-whisper", "soundfile"]
+google-cloud = ["google-cloud-speech"]
+groq = ["groq", "httpx (<0.28)"]
+openai = ["httpx (<0.28)", "openai"]
+pocketsphinx = ["pocketsphinx"]
+vosk = ["vosk"]
+whisper-local = ["openai-whisper", "soundfile"]
+
+[[package]]
 name = "streamlit"
 version = "1.54.0"
 description = "A faster way to build and share data apps"
@@ -1715,6 +1742,22 @@ performance = ["httptools (>=0.6.3)", "orjson (>=3.5.0)", "uvloop (>=0.15.2) ; s
 snowflake = ["snowflake-connector-python (>=3.3.0) ; python_version < \"3.12\"", "snowflake-snowpark-python[modin] (>=1.17.0) ; python_version < \"3.12\""]
 sql = ["SQLAlchemy (>=2.0.0)"]
 starlette = ["anyio (>=4.0.0)", "itsdangerous (>=2.1.2)", "python-multipart (>=0.0.10)", "starlette (>=0.40.0)", "uvicorn (>=0.30.0)", "websockets (>=12.0.0)"]
+
+[[package]]
+name = "streamlit-mic-recorder"
+version = "0.0.8"
+description = "Streamlit component that allows to record mono audio from the user's microphone, and/or perform speech recognition directly."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "streamlit_mic_recorder-0.0.8-py3-none-any.whl", hash = "sha256:acbd5ed868dba083d567341c85f1740ae42bd03259c2780dce7f69d5bc109ac8"},
+    {file = "streamlit_mic_recorder-0.0.8.tar.gz", hash = "sha256:5a29a98f3bd1582f9d5d90911ef498b32244863d646759c2f5ceec515befb6cf"},
+]
+
+[package.dependencies]
+SpeechRecognition = "*"
+streamlit = ">=0.63"
 
 [[package]]
 name = "tenacity"
@@ -1891,4 +1934,4 @@ watchmedo = ["PyYAML (>=3.10)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "==3.11.9"
-content-hash = "008df93645c7ea310bea596ceb21e35d5327ed98d1e442c45d62b1eec4ee9e36"
+content-hash = "5140ad7faee53ac047ad6c63a6a3fec0be54ad0d33a36218e9fcce760bc3c2ad"

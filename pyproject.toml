@@ -16,6 +16,7 @@ dependencies = [
     "numpy (<2.0.0)",
     "streamlit>=1.30.0",
     "watchdog>=4.0.0",
+    "streamlit-mic-recorder (>=0.0.8,<0.0.9)",
 ]
 
 
